@@ -19,13 +19,15 @@ import { PDFDocumentProxy } from 'ng2-pdf-viewer';
 import { ToastService } from 'src/app/services/toast.service';
 import { TextComponent } from '../common/input/text/text.component';
 import { SettingsService, SETTINGS_KEYS } from 'src/app/services/settings.service';
+import { dirtyCheck, DirtyComponent } from '@ngneat/dirty-check-forms';
+import { Observable, Subscription, BehaviorSubject } from 'rxjs';
 
 @Component({
   selector: 'app-document-detail',
   templateUrl: './document-detail.component.html',
   styleUrls: ['./document-detail.component.scss']
 })
-export class DocumentDetailComponent implements OnInit {
+export class DocumentDetailComponent implements OnInit, DirtyComponent {
 
   @ViewChild("inputTitle")
   titleInput: TextComponent
@@ -60,6 +62,10 @@ export class DocumentDetailComponent implements OnInit {
 
   previewCurrentPage: number = 1
   previewNumPages: number = 1
+
+  store: BehaviorSubject<any>
+  storeSub: Subscription
+  isDirty$: Observable<boolean>
 
   constructor(
     private documentsService: DocumentService,
@@ -97,12 +103,29 @@ export class DocumentDetailComponent implements OnInit {
       this.downloadOriginalUrl = this.documentsService.getDownloadUrl(this.documentId, true)
       if (this.openDocumentService.getOpenDocument(this.documentId)) {
         this.updateComponent(this.openDocumentService.getOpenDocument(this.documentId))
-      } else {
-        this.documentsService.get(this.documentId).subscribe(doc => {
+      }
+      this.documentsService.get(this.documentId).subscribe(doc => {
+        // Initialize dirtyCheck
+        this.store = new BehaviorSubject({
+          title: doc.title,
+          content: doc.content,
+          created: doc.created,
+          correspondent: doc.correspondent,
+          document_type: doc.document_type,
+          archive_serial_number: doc.archive_serial_number,
+          tags: doc.tags
+        })
+
+        this.isDirty$ = dirtyCheck(this.documentForm, this.store.asObservable())
+        this.isDirty$.subscribe(dirty => {
+          this.openDocumentService.setDirty(this.document.id, dirty)
+        })
+        
+        if (!this.openDocumentService.getOpenDocument(this.documentId)) {
           this.openDocumentService.openDocument(doc)
           this.updateComponent(doc)
-        }, error => {this.router.navigate(['404'])})
-      }
+        }
+      }, error => {this.router.navigate(['404'])})
     })
 
   }
@@ -148,6 +171,7 @@ export class DocumentDetailComponent implements OnInit {
 
   save() {
     this.networkActive = true
+    this.store.next(this.documentForm.value)
     this.documentsService.update(this.document).subscribe(result => {
       this.close()
       this.networkActive = false
@@ -160,6 +184,7 @@ export class DocumentDetailComponent implements OnInit {
 
   saveEditNext() {
     this.networkActive = true
+    this.store.next(this.documentForm.value)
     this.documentsService.update(this.document).subscribe(result => {
       this.error = null
       this.documentListViewService.getNext(this.document.id).subscribe(nextDocId => {
@@ -175,6 +200,26 @@ export class DocumentDetailComponent implements OnInit {
     }, error => {
       this.networkActive = false
       this.error = error.error
+    })
+  }
+
+  maybeClose() {
+    this.isDirty$.subscribe(dirty => {
+      if (dirty) {
+        let modal = this.modalService.open(ConfirmDialogComponent, {backdrop: 'static'})
+        modal.componentInstance.title = $localize`Unsaved Changes`
+        modal.componentInstance.messageBold = $localize`You have unsaved changes.`
+        modal.componentInstance.message = $localize`Are you sure you want to leave?`
+        modal.componentInstance.btnClass = "btn-warning"
+        modal.componentInstance.btnCaption = $localize`Leave page`
+        modal.componentInstance.confirmClicked.subscribe(() => {
+          modal.componentInstance.buttonsEnabled = false
+          modal.close()
+          this.close()
+        })
+      } else {
+        this.close()
+      }
     })
   }
 
