@@ -399,6 +399,7 @@ class SavedViewFilterRule(models.Model):
         (15, _("modified before")),
         (16, _("modified after")),
         (17, _("does not have tag")),
+        (19, _("has tags in")),
     ]
 
     saved_view = models.ForeignKey(

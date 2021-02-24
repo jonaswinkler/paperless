@@ -8,7 +8,7 @@ import { DocumentTypeService } from 'src/app/services/rest/document-type.service
 import { TagService } from 'src/app/services/rest/tag.service';
 import { CorrespondentService } from 'src/app/services/rest/correspondent.service';
 import { FilterRule } from 'src/app/data/filter-rule';
-import { FILTER_ADDED_AFTER, FILTER_ADDED_BEFORE, FILTER_CORRESPONDENT, FILTER_CREATED_AFTER, FILTER_CREATED_BEFORE, FILTER_DOCUMENT_TYPE, FILTER_HAS_ANY_TAG, FILTER_HAS_TAG, FILTER_TITLE } from 'src/app/data/filter-rule-type';
+import { FILTER_ADDED_AFTER, FILTER_ADDED_BEFORE, FILTER_CORRESPONDENT, FILTER_CREATED_AFTER, FILTER_CREATED_BEFORE, FILTER_DOCUMENT_TYPE, FILTER_HAS_ANY_TAG, FILTER_HAS_TAGS_ALL, FILTER_HAS_TAGS_ANY, FILTER_DOES_NOT_HAVE_TAG, FILTER_TITLE } from 'src/app/data/filter-rule-type';
 import { FilterableDropdownSelectionModel } from '../../common/filterable-dropdown/filterable-dropdown.component';
 import { ToggleableItemState } from '../../common/filterable-dropdown/toggleable-dropdown-button/toggleable-dropdown-button.component';
 
@@ -38,7 +38,7 @@ export class FilterEditorComponent implements OnInit, OnDestroy {
             return $localize`Without document type`
           }
 
-        case FILTER_HAS_TAG:
+        case FILTER_HAS_TAGS_ALL:
           return $localize`Tag: ${this.tags.find(t => t.id == +rule.value)?.name}`
 
         case FILTER_HAS_ANY_TAG:
@@ -103,11 +103,18 @@ export class FilterEditorComponent implements OnInit, OnDestroy {
         case FILTER_ADDED_BEFORE:
           this.dateAddedBefore = rule.value
           break
-        case FILTER_HAS_TAG:
+        case FILTER_HAS_TAGS_ALL:
+          this.tagSelectionModel.set(rule.value ? +rule.value : null, ToggleableItemState.Selected, false)
+          break
+        case FILTER_HAS_TAGS_ANY:
+          this.tagSelectionModel.logicalOperator = 'or'
           this.tagSelectionModel.set(rule.value ? +rule.value : null, ToggleableItemState.Selected, false)
           break
         case FILTER_HAS_ANY_TAG:
           this.tagSelectionModel.set(null, ToggleableItemState.Selected, false)
+          break
+        case FILTER_DOES_NOT_HAVE_TAG:
+          this.tagSelectionModel.set(rule.value ? +rule.value : null, ToggleableItemState.Excluded, false)
           break
         case FILTER_CORRESPONDENT:
           this.correspondentSelectionModel.set(rule.value ? +rule.value : null, ToggleableItemState.Selected, false)
@@ -127,8 +134,12 @@ export class FilterEditorComponent implements OnInit, OnDestroy {
     if (this.tagSelectionModel.isNoneSelected()) {
       filterRules.push({rule_type: FILTER_HAS_ANY_TAG, value: "false"})
     } else {
+      const tagFilterType = this.tagSelectionModel.logicalOperator == 'and' ? FILTER_HAS_TAGS_ALL : FILTER_HAS_TAGS_ANY
       this.tagSelectionModel.getSelectedItems().filter(tag => tag.id).forEach(tag => {
-        filterRules.push({rule_type: FILTER_HAS_TAG, value: tag.id?.toString()})
+        filterRules.push({rule_type: tagFilterType, value: tag.id?.toString()})
+      })
+      this.tagSelectionModel.getExcludedItems().filter(tag => tag.id).forEach(tag => {
+        filterRules.push({rule_type: FILTER_DOES_NOT_HAVE_TAG, value: tag.id?.toString()})
       })
     }
     this.correspondentSelectionModel.getSelectedItems().forEach(correspondent => {
@@ -200,16 +211,16 @@ export class FilterEditorComponent implements OnInit, OnDestroy {
     this.reset.next()
   }
 
-  toggleTag(tagId: number) {
-    this.tagSelectionModel.toggle(tagId)
+  addTag(tagId: number) {
+    this.tagSelectionModel.set(tagId, ToggleableItemState.Selected)
   }
 
-  toggleCorrespondent(correspondentId: number) {
-    this.correspondentSelectionModel.toggle(correspondentId)
+  addCorrespondent(correspondentId: number) {
+    this.correspondentSelectionModel.set(correspondentId, ToggleableItemState.Selected)
   }
 
-  toggleDocumentType(documentTypeId: number) {
-    this.documentTypeSelectionModel.toggle(documentTypeId)
+  addDocumentType(documentTypeId: number) {
+    this.documentTypeSelectionModel.set(documentTypeId, ToggleableItemState.Selected)
   }
 
   onTagsDropdownOpen() {
