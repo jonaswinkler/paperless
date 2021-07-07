@@ -659,6 +659,27 @@ Docker-specific options
 These options don't have any effect in ``paperless.conf``. These options adjust
 the behavior of the docker container. Configure these in `docker-compose.env`.
 
+It is also possible to load specific environment variables from named files.
+You may wish to use this when using, e.g.,  Docker secrets.  To do this,
+simply set an environment variable with a ``_FROM_FILE`` suffix to the
+(fully-qualified) name of the file containing the value.
+
+For example, the suppose our database password "notyourpass" is stored in
+``/run/secrets/db``.  We would then set our configuration to include:
+
+    .. code:: bash
+
+        # this is set in our configuration
+        PAPERLESS_DBPASS_FROM_FILE=/run/secrets/db
+
+When the container is run it will then export into the running environment:
+
+    .. code:: bash
+
+        # this will be dynamically set by the container itself when run
+        PAPERLESS_DBPASS=notyourpass
+
+
 PAPERLESS_WEBSERVER_WORKERS=<num>
     The number of worker processes the webserver should spawn. More worker processes
     usually result in the front end to load data much quicker. However, each worker process

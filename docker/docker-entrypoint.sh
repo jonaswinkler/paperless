@@ -74,12 +74,34 @@ install_languages() {
 	done
 }
 
+load_secrets() {
+	# Look for any paperless variables with a '_FROM_FILE' suffix, and
+	# load the root variable with the content of the named file.  This
+	# will allow the use of bind-mounted files / secrets / etc rather than
+	# just sticking it in the environment.
+
+	for secret in ${!PAPERLESS_@} ; do
+
+		# no point if it's empty
+		[[ ! -z "${!secret}" ]] || continue
+
+		if [[ "${secret%_FROM_FILE}" != "$secret" ]] ; then
+			local target=${secret%_FROM_FILE}
+			echo "Loading secret into ${target} from ${!secret}..."
+			export "${target}"="$(cat ${!secret})"
+		fi
+
+	done
+}
+
 echo "Paperless-ng docker container starting..."
 
 # Install additional languages if specified
 if [[ ! -z "$PAPERLESS_OCR_LANGUAGES" ]]; then
 	install_languages "$PAPERLESS_OCR_LANGUAGES"
 fi
+
+load_secrets
 
 initialize
 
